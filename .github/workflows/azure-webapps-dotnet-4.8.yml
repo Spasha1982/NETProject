@@ -37,8 +37,8 @@ jobs:
       uses: microsoft/setup-msbuild@v2
       with:
         vs-version: '17.0'
-
-    - name: Build and Package Solution
+        
+    - name: Build and Publish Solution
       shell: pwsh
       run: |
         $sln = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
@@ -47,24 +47,45 @@ jobs:
         $publishDir = "${{ env.PackageLocation }}"
         New-Item -Path $publishDir -ItemType Directory -Force | Out-Null
 
-        Write-Host "Building and packaging solution: $($sln.FullName)"
+        Write-Host "Building and publishing solution: $($sln.FullName)"
         msbuild "$($sln.FullName)" `
           /p:DeployOnBuild=true `
           /p:WebPublishMethod=FileSystem `
           /p:DeleteExistingFiles=true `
-          /p:publishUrl="$publishDir"
-          /p:PackageAsSingleFile=true `
-          /p:SkipInvalidConfigurations=true `
-          /p:PackageLocation="$publishDir" `
-          /p:IncludeServerNameInBuildInfo=true `
-          /p:GenerateBuildInfoConfigFile=true `
-          /p:BuildSymbolStorePath="${{ env.SymbolPath }}" `
-          /p:ReferencePath="${{ env.ReferencePath }}" `
+          /p:publishUrl="$publishDir" `
           /p:Platform="${{ env.BuildPlatform }}" `
           /p:Configuration="${{ env.BuildConfiguration }}" `
           /p:VisualStudioVersion="17.0"
 
-        Write-Host "Build completed. Packages stored in: $publishDir"
+        Write-Host "Build completed successfully. Files published to $publishDir"
+
+    # - name: Build and Package Solution
+      # shell: pwsh
+      # run: |
+      #   $sln = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
+      #   if (-not $sln) { throw "No .sln file found in repository" }
+
+      #   $publishDir = "${{ env.PackageLocation }}"
+      #   New-Item -Path $publishDir -ItemType Directory -Force | Out-Null
+
+      #   Write-Host "Building and packaging solution: $($sln.FullName)"
+      #   msbuild "$($sln.FullName)" `
+      #     /p:DeployOnBuild=true `
+      #     /p:WebPublishMethod=FileSystem `
+      #     /p:DeleteExistingFiles=true `
+      #     /p:publishUrl="$publishDir"
+      #     /p:PackageAsSingleFile=true `
+      #     /p:SkipInvalidConfigurations=true `
+      #     /p:PackageLocation="$publishDir" `
+      #     /p:IncludeServerNameInBuildInfo=true `
+      #     /p:GenerateBuildInfoConfigFile=true `
+      #     /p:BuildSymbolStorePath="${{ env.SymbolPath }}" `
+      #     /p:ReferencePath="${{ env.ReferencePath }}" `
+      #     /p:Platform="${{ env.BuildPlatform }}" `
+      #     /p:Configuration="${{ env.BuildConfiguration }}" `
+      #     /p:VisualStudioVersion="17.0"
+
+      #   Write-Host "Build completed. Packages stored in: $publishDir"
 
     - name: Copy build output and JSON files to artifact staging directory
       shell: pwsh
@@ -133,6 +154,7 @@ jobs:
       uses: azure/webapps-deploy@v3
       with:
         app-name: 'SFinfotechwebapp01'     # 👈 Replace this
-        slot-name: 'production'                  # Optional, or 'staging'
-        package: 'D:\a\NETProject\NETProject\drop'
+        slot-name: 'production'
+        package: '${{ env.PackageLocation }}'# Optional, or 'staging'
+        # package: 'D:\a\NETProject\NETProject\drop'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
