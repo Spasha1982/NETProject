@@ -18,7 +18,7 @@ jobs:
           name: drop
           path: ${{ github.workspace }}/drop
           repository: Spasha1982/NETProject
-          run-id: 207fc29
+          run-id: 18873092812
 
       - name: Verify contents
         shell: pwsh
