@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write       # needed for OIDC authentication
+  id-token: write       # Needed for OIDC login to Azure
   contents: read
 
 env:
@@ -19,11 +19,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # Checkout code
+    # ✅ Step 1: Checkout the code
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 🔹 Automatically find the .sln file and restore NuGet packages
+    # ✅ Step 2: Restore NuGet packages
     - name: Restore NuGet packages
       run: |
         $solution = Get-ChildItem -Path ${{ github.workspace }} -Filter *.sln -Recurse | Select-Object -First 1
@@ -32,14 +32,28 @@ jobs:
         nuget restore $solution.FullName
       shell: pwsh
 
-    # 🔹 Build the solution (Release mode)
+    # ✅ Step 3: Build and publish using MSBuild
     - name: Build solution
       run: |
         $solution = Get-ChildItem -Path ${{ github.workspace }} -Filter *.sln -Recurse | Select-Object -First 1
-        msbuild $solution.FullName /p:Configuration=Release /p:Platform="Any CPU" /p:DeployOnBuild=true /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=true /p:publishUrl="${{ github.workspace }}\publish"
+        if (-not $solution) { throw "❌ No .sln file found" }
+
+        # Locate MSBuild on the GitHub Windows runner
+        $msbuild = &"${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+          -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe
+        if (-not $msbuild) { throw "❌ MSBuild not found on runner" }
+
+        Write-Host "✅ Using MSBuild at: $msbuild"
+        & "$msbuild" $solution.FullName `
+          /p:Configuration=Release `
+          /p:Platform="Any CPU" `
+          /p:DeployOnBuild=true `
+          /p:WebPublishMethod=FileSystem `
+          /p:DeleteExistingFiles=true `
+          /p:publishUrl="${{ github.workspace }}\publish"
       shell: pwsh
 
-    # 🔹 Login to Azure using Federated Identity (OIDC)
+    # ✅ Step 4: Login to Azure (OIDC)
     - name: Azure Login (OIDC)
       uses: azure/login@v2
       with:
@@ -47,9 +61,9 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    # 🔹 Deploy to Azure Web App
+    # ✅ Step 5: Deploy to Azure Web App
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
       with:
-        app-name: "SFinfotechwebapp01"   # <-- change this to your Web App name
+        app-name: "SFinfotechwebapp01"   # 🔹 Replace with your Web App name
         package: "${{ github.workspace }}\\publish"
