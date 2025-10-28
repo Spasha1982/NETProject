@@ -64,17 +64,23 @@ jobs:
 
         Write-Host "Build completed. Packages stored in: $publishDir"
 
-    - name: Copy only JSON config files to artifact staging directory
+    - name: Copy build output and JSON files to artifact staging directory
       shell: pwsh
       run: |
         $source = "${{ github.workspace }}"
-        $target = Join-Path $source "artifact"
-        Write-Host "Copying only JSON files from $source to $target"
+        $drop   = "${{ env.PackageLocation }}"
+        $target = "${{ env.ArtifactPath }}"
 
-        # Ensure target exists
+        Write-Host "Combining build output and JSON files into $target"
+
         New-Item -Path $target -ItemType Directory -Force | Out-Null
 
-        # Copy only *.json files (recursively)
+        # Copy build output
+        if (Test-Path $drop) {
+          Copy-Item -Path "$drop\*" -Destination $target -Recurse -Force
+        }
+
+        # Copy JSON files (keep directory structure)
         Get-ChildItem -Path $source -Recurse -Filter *.json -File |
           ForEach-Object {
             $relativePath = $_.FullName.Substring($source.Length).TrimStart('\')
@@ -86,7 +92,8 @@ jobs:
             Copy-Item $_.FullName -Destination $destPath -Force
           }
 
-        Write-Host "All JSON files copied successfully to $target"
+        Write-Host "Copied build output and JSON files successfully to $target"
+
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
