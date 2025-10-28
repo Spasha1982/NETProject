@@ -55,6 +55,13 @@ jobs:
             /p:Platform="${{ env.BuildPlatform }}"
 
           Write-Host "✅ Publish complete. Files in: $publishFolder"
+          
+      - name: Login to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
