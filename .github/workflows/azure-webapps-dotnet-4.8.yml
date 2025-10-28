@@ -117,12 +117,17 @@ jobs:
 
         Write-Host "Copied build output and JSON files successfully to $target"
 
-
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.ArtifactName }}
-        path: ${{ env.ArtifactPath }}
+        name: drop
+        path: ${{ env.PackageLocation }}
+
+    # - name: Upload artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: ${{ env.ArtifactName }}
+    #     path: ${{ env.ArtifactPath }}
   # -------------------------------
   # 🚀 DEPLOY JOB
   # -------------------------------
@@ -140,7 +145,13 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: drop
-        path: D:\a\NETProject\NETProject\drop
+        path: ${{ github.workspace }}\artifact
+
+    # - name: Download build artifact
+    #   uses: actions/download-artifact@v4
+    #   with:
+    #     name: drop
+    #     path: D:\a\NETProject\NETProject\drop
         
     # - name: Login to Azure using OIDC
     #   uses: azure/login@v2
@@ -149,12 +160,10 @@ jobs:
     #       tenant-id: ${{ secrets.AZURE_TENANT_ID }}
     #       subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           
-    - name: Deploy to Azure Web App
-      id: deploy-to-webapp
+    - name: Deploy to Azure Web
       uses: azure/webapps-deploy@v3
       with:
-        app-name: 'SFinfotechwebapp01'     # 👈 Replace this
-        slot-name: 'production'
-        package: '${{ env.PackageLocation }}'# Optional, or 'staging'
-        # package: 'D:\a\NETProject\NETProject\drop'
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+            app-name: 'SFinfotechwebapp01'
+            publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+            package: '${{ github.workspace }}\artifact'
+
