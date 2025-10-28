@@ -1,63 +1,58 @@
-name: Build and Deploy ASP.NET Framework App to Azure
+name: Build and Deploy ASP.NET Framework App to Azure WebApp (OIDC)
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+
 permissions:
-  id-token: write       # Required for OIDC (federated) authentication
-  contents: read
+  id-token: write        # ✅ Required for OIDC login
+  contents: read         # ✅ Allows reading the repo contents
+
 env:
+  BuildConfiguration: Release
   BuildPlatform: "Any CPU"
-  BuildConfiguration: "Release"
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
+      # 1️⃣ Checkout source code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
-
+      # 2️⃣ Setup NuGet
       - name: Setup NuGet
-        uses: NuGet/setup-nuget@v2
+        uses: nuget/setup-nuget@v2
 
+      # 3️⃣ Restore NuGet packages
       - name: Restore NuGet packages
+        run: nuget restore **/*.sln
+
+      # 4️⃣ Build and Publish ASP.NET Framework project
+      - name: Build and Publish
         shell: pwsh
         run: |
-          $solution = Get-ChildItem -Path ${{ github.workspace }} -Filter *.sln -Recurse | Select-Object -First 1
-          if (-not $solution) {
-            Write-Error "❌ No .sln file found"
-            exit 1
-          }
-          Write-Host "✅ Found solution: $($solution.FullName)"
-          nuget restore "$($solution.FullName)"
-
-      - name: Build and publish (ASP.NET Framework 4.8)
-        shell: pwsh
-        run: |
-          $solution = Get-ChildItem -Path ${{ github.workspace }} -Filter *.sln -Recurse | Select-Object -First 1
-          $publishFolder = Join-Path $env:RUNNER_TEMP "publish_output"
-          New-Item -ItemType Directory -Force -Path $publishFolder | Out-Null
-
-          Write-Host "✅ Building solution: $($solution.FullName)"
-          msbuild $solution.FullName /p:Configuration=${{ env.BuildConfiguration }} /p:Platform="${{ env.BuildPlatform }}"
-
-          Write-Host "✅ Publishing website to $publishFolder"
-          msbuild $solution.FullName `
+          # Locate first .csproj file
+          $project = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter *.csproj -Recurse | Select-Object -First 1
+          Write-Host "Building project: $($project.FullName)"
+          
+          $publishDir = Join-Path $env:RUNNER_TEMP "publish_output"
+          
+          msbuild $project.FullName `
+            /p:Configuration=$env:BuildConfiguration `
+            /p:Platform="$env:BuildPlatform" `
             /p:DeployOnBuild=true `
             /p:WebPublishMethod=FileSystem `
             /p:DeleteExistingFiles=true `
-            /p:publishUrl="$publishFolder" `
-            /p:Configuration=${{ env.BuildConfiguration }} `
-            /p:Platform="${{ env.BuildPlatform }}"
+            /p:publishUrl="$publishDir"
 
-          Write-Host "✅ Publish complete. Files in: $publishFolder"
-          
+          Write-Host "Publish completed. Output folder: $publishDir"
+          Get-ChildItem $publishDir
+
+      # 5️⃣ Login to Azure using OIDC (Federated Identity)
       - name: Login to Azure using OIDC
         uses: azure/login@v2
         with:
@@ -65,12 +60,15 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # 6️⃣ Deploy to Azure App Service
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: "SFinfotechwebapp01"
-          slot-name: "production"
-          package: ${{ runner.temp }}\publish_output
+          app-name: "SFinfotechwebapp01"              # 👈 Your Web App name
+          package: ${{ runner.temp }}/publish_output  # 👈 Publish output folder
+
+
+
 
 
 
