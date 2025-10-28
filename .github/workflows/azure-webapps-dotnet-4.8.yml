@@ -1,81 +1,99 @@
-name: Build ASP.NET Framework App
-env:
-  AZURE_WEBAPP_NAME: SFinfotechwebapp01
+name: Build and Deploy ASP.NET App to Azure Web App (OIDC + Extract PackageTmp)
+
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
+  workflow_dispatch:
+
 permissions:
-  id-token: write
+  id-token: write      # 👈 Required for OIDC
   contents: read
+
+env:
+  Solution: '**/*.sln'
+  BuildPlatform: 'Any CPU'
+  BuildConfiguration: 'Release'
+
 jobs:
-  build:
+  build-and-deploy:
     runs-on: windows-latest
-    env:
-      BuildPlatform: 'Any CPU'
-      BuildConfiguration: 'Release'
 
     steps:
-    - name: Checkout repository
+    # --------------------------
+    # 1️⃣ Checkout
+    # --------------------------
+    - name: Checkout Code
       uses: actions/checkout@v4
 
+    # --------------------------
+    # 2️⃣ Setup NuGet
+    # --------------------------
     - name: Setup NuGet
-      uses: nuget/setup-nuget@v2
-      with:
-        nuget-version: 'latest'
+      uses: NuGet/setup-nuget@v2
 
-    - name: Restore NuGet packages
-      run: |
-        $solution = Get-ChildItem -Path . -Recurse -Filter *.sln | Select-Object -First 1
-        if (-not $solution) { throw "No .sln file found in repo" }
-        Write-Host "Restoring packages for $($solution.FullName)"
-        nuget restore "$($solution.FullName)"
+    # --------------------------
+    # 3️⃣ Restore Packages
+    # --------------------------
+    - name: Restore NuGet Packages
+      run: nuget restore "$env:Solution"
       shell: pwsh
 
+    # --------------------------
+    # 4️⃣ Setup MSBuild
+    # --------------------------
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
-      with:
-        vs-version: '[17.0,)'   # VS 2022 or later
 
-    - name: Build Solution
+    # --------------------------
+    # 5️⃣ Build & Package (WebDeploy)
+    # --------------------------
+    - name: Build Solution (MSDeploy Package)
       run: |
         msbuild $env:Solution `
-        /p:WebPublishMethod=FileSystem `
-        /p:DeployOnBuild=true `
-        /p:PublishUrl="$(Build.ArtifactStagingDirectory)" `
-        /p:SkipInvalidConfigurations=true `
-        /p:Platform="$env:BuildPlatform" `
-        /p:Configuration="$env:BuildConfiguration"
+          /p:DeployOnBuild=true `
+          /p:WebPublishMethod=Package `
+          /p:PackageAsSingleFile=true `
+          /p:SkipInvalidConfigurations=true `
+          /p:PackageLocation="${{ github.workspace }}\package" `
+          /p:Platform="$env:BuildPlatform" `
+          /p:Configuration="$env:BuildConfiguration"
       shell: pwsh
 
-    - name: Copy JSON config files
+    # --------------------------
+    # 6️⃣ Extract WebDeploy Package
+    # --------------------------
+    - name: Extract PackageTmp folder
       run: |
-        mkdir -p drop\json
-        Get-ChildItem -Path . -Recurse -Include *.json | Copy-Item -Destination drop\json
+        $pkg = Get-ChildItem "${{ github.workspace }}\package" -Filter *.zip | Select-Object -First 1
+        if (-not $pkg) { throw "No MSDeploy package found in package folder." }
+        Expand-Archive -Path $pkg.FullName -DestinationPath "${{ github.workspace }}\extracted"
       shell: pwsh
 
-    - name: Upload build artifact
+    # --------------------------
+    # 7️⃣ Upload Artifact (optional)
+    # --------------------------
+    - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: drop
-        path: drop
- # -------------------------------
-    # 7️⃣ Deploy to Azure App Service
- # -------------------------------
+        name: webapp-package
+        path: ${{ github.workspace }}/extracted/PackageTmp
+
+    # --------------------------
+    # 8️⃣ Azure Login (OIDC)
+    # --------------------------
     - name: Azure Login (OIDC)
       uses: azure/login@v2
       with:
-        
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        #client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        
-        
+
+    # --------------------------
+    # 9️⃣ Deploy to Azure Web App
+    # --------------------------
     - name: Deploy to Azure Web App
-      id: deploy-to-webapp
       uses: azure/webapps-deploy@v3
       with:
-        app-name: ${{ env.AZURE_WEBAPP_NAME }}
-        package: ${{ env.BUILD_ARTIFACTSTAGINGDIRECTORY }}
+        app-name: 'SFinfotechwebapp01'
+        package: ${{ github.workspace }}/extracted/PackageTmp
