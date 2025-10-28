@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write       # Needed for OIDC login to Azure
+  id-token: write       # Required for OIDC (federated) authentication
   contents: read
 
 env:
@@ -19,11 +19,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    # ✅ Step 1: Checkout the code
+    # ✅ Step 1: Checkout the source code
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # ✅ Step 2: Restore NuGet packages
+    # ✅ Step 2: Restore NuGet packages automatically
     - name: Restore NuGet packages
       run: |
         $solution = Get-ChildItem -Path ${{ github.workspace }} -Filter *.sln -Recurse | Select-Object -First 1
@@ -32,28 +32,40 @@ jobs:
         nuget restore $solution.FullName
       shell: pwsh
 
-    # ✅ Step 3: Build and publish using MSBuild
-    - name: Build solution
+    # ✅ Step 3: Build and publish the solution
+    - name: Build and publish solution
       run: |
         $solution = Get-ChildItem -Path ${{ github.workspace }} -Filter *.sln -Recurse | Select-Object -First 1
         if (-not $solution) { throw "❌ No .sln file found" }
 
-        # Locate MSBuild on the GitHub Windows runner
+        # Locate MSBuild on the runner
         $msbuild = &"${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
           -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe
         if (-not $msbuild) { throw "❌ MSBuild not found on runner" }
 
         Write-Host "✅ Using MSBuild at: $msbuild"
+
+        # Define and create publish output folder
+        $publishFolder = Join-Path $env:RUNNER_TEMP "publish_output"
+        New-Item -ItemType Directory -Force -Path $publishFolder | Out-Null
+
+        # Build and publish the web app
         & "$msbuild" $solution.FullName `
           /p:Configuration=Release `
           /p:Platform="Any CPU" `
-          /p:DeployOnBuild=true `
           /p:WebPublishMethod=FileSystem `
           /p:DeleteExistingFiles=true `
-          /p:publishUrl="${{ github.workspace }}\publish"
+          /p:publishUrl="$publishFolder"
+
+        Write-Host "✅ Build and publish complete. Output folder: $publishFolder"
       shell: pwsh
 
-    # ✅ Step 4: Login to Azure (OIDC)
+    # ✅ Step 4 (Optional): Verify publish folder contents
+    - name: Verify publish folder contents
+      run: Get-ChildItem -Recurse ${{ runner.temp }}\publish_output
+      shell: pwsh
+
+    # ✅ Step 5: Azure Login via OIDC (no secrets)
     - name: Azure Login (OIDC)
       uses: azure/login@v2
       with:
@@ -61,9 +73,9 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    # ✅ Step 5: Deploy to Azure Web App
+    # ✅ Step 6: Deploy to Azure Web App
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
       with:
-        app-name: "SFinfotechwebapp01"   # 🔹 Replace with your Web App name
-        package: "${{ github.workspace }}\\publish"
+        app-name: "SFinfotechwebapp01"     # 🔹 Replace with your Azure Web App name
+        package: ${{ runner.temp }}\publish_output
