@@ -40,39 +40,24 @@ jobs:
           nuget restore $solution.FullName
 
       # 4️⃣ Build and publish using full MSBuild path
-      - name: Build and Publish
+      - name: Build and Publish (Solution-based)
         shell: pwsh
         run: |
-          $project = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter *.csproj -Recurse | Where-Object { $_.FullName -match 'Website|WebApplication' } | Select-Object -First 1
-          if (-not $project) {
-            Write-Error "❌ No .csproj file found for web app!"
+          $solution = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter *.sln -Recurse | Select-Object -First 1
+          if (-not $solution) {
+            Write-Error "❌ No .sln file found in repo!"
             exit 1
           }
 
-          Write-Host "🔧 Building project: $($project.FullName)"
+          Write-Host "🧩 Building solution: $($solution.FullName)"
           $publishDir = Join-Path $env:RUNNER_TEMP "publish_output"
+          if (-not (Test-Path $publishDir)) { New-Item -ItemType Directory -Path $publishDir | Out-Null }
 
-          # Ensure directory exists
-          if (-not (Test-Path $publishDir)) {
-            New-Item -ItemType Directory -Path $publishDir | Out-Null
-            Write-Host "📁 Created directory: $publishDir"
-          }
+          $msbuild = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
 
-          # Find MSBuild.exe
-          $msbuildPaths = @(
-            "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe",
-            "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
-          )
-          $msbuild = $msbuildPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $msbuild) {
-            Write-Error "❌ MSBuild.exe not found on this agent!"
-            exit 1
-          }
-
-          Write-Host "🛠 Using MSBuild: $msbuild"
-          & $msbuild $project.FullName `
-            /p:Configuration=$env:BuildConfiguration `
-            /p:Platform="$env:BuildPlatform" `
+          & $msbuild $solution.FullName `
+            /p:Configuration=Release `
+            /p:Platform="Any CPU" `
             /p:DeployOnBuild=true `
             /p:WebPublishMethod=FileSystem `
             /p:DeleteExistingFiles=true `
@@ -83,10 +68,9 @@ jobs:
             Write-Host "✅ Build completed. Published to: $publishDir"
             Get-ChildItem -Recurse $publishDir
           } else {
-            Write-Error "❌ Publish folder not found! Check MSBuild output above for any errors."
+            Write-Error "❌ Publish folder not found! Check MSBuild output above."
             exit 1
           }
-
 
       # 5️⃣ Login to Azure using OIDC (no secrets required)
       - name: Login to Azure using OIDC
