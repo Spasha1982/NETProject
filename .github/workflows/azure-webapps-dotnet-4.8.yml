@@ -38,11 +38,15 @@ jobs:
       with:
         vs-version: '[17.0,)'   # VS 2022 or later
 
-    - name: Build solution
+    - name: Build Solution
       run: |
-        $solution = Get-ChildItem -Path . -Recurse -Filter *.sln | Select-Object -First 1
-        if (-not $solution) { throw "No .sln file found in repo" }
-        msbuild "$($solution.FullName)" /p:Configuration=$env:BuildConfiguration /p:Platform="$env:BuildPlatform" /p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(pwd)\drop"
+        msbuild $env:Solution `
+        /p:WebPublishMethod=FileSystem `
+        /p:DeployOnBuild=true `
+        /p:PublishUrl="$(Build.ArtifactStagingDirectory)" `
+        /p:SkipInvalidConfigurations=true `
+        /p:Platform="$env:BuildPlatform" `
+        /p:Configuration="$env:BuildConfiguration"
       shell: pwsh
 
     - name: Copy JSON config files
@@ -74,4 +78,4 @@ jobs:
       uses: azure/webapps-deploy@v3
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
-        package: 'drop\*.zip'
+        package: ${{ env.BUILD_ARTIFACTSTAGINGDIRECTORY }}
