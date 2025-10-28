@@ -2,7 +2,7 @@ name: Build ASP.NET Framework App
 
 on:
   push:
-    branches: [ main ]
+    branches: none
 
 jobs:
   build:
