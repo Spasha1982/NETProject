@@ -8,11 +8,8 @@ on:
 
 jobs:
   build:
-    name: Build with MSBuild
     runs-on: windows-latest
-
     env:
-      Solution: '**/*.sln'
       BuildPlatform: 'Any CPU'
       BuildConfiguration: 'Release'
 
@@ -26,7 +23,12 @@ jobs:
         nuget-version: 'latest'
 
     - name: Restore NuGet packages
-      run: nuget restore $env:Solution
+      run: |
+        $solution = Get-ChildItem -Path . -Recurse -Filter *.sln | Select-Object -First 1
+        if (-not $solution) { throw "No .sln file found in repo" }
+        Write-Host "Restoring packages for $($solution.FullName)"
+        nuget restore "$($solution.FullName)"
+      shell: pwsh
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
@@ -34,15 +36,20 @@ jobs:
         vs-version: '[17.0,)'   # VS 2022 or later
 
     - name: Build solution
-      run: msbuild $env:Solution /p:Configuration=$env:BuildConfiguration /p:Platform="$env:BuildPlatform" /p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="D:\a\drop"
+      run: |
+        $solution = Get-ChildItem -Path . -Recurse -Filter *.sln | Select-Object -First 1
+        if (-not $solution) { throw "No .sln file found in repo" }
+        msbuild "$($solution.FullName)" /p:Configuration=$env:BuildConfiguration /p:Platform="$env:BuildPlatform" /p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(pwd)\drop"
+      shell: pwsh
 
     - name: Copy JSON config files
       run: |
-        mkdir -p D:\a\drop\json
-        Get-ChildItem -Path . -Recurse -Include *.json | Copy-Item -Destination D:\a\drop\json
+        mkdir -p drop\json
+        Get-ChildItem -Path . -Recurse -Include *.json | Copy-Item -Destination drop\json
+      shell: pwsh
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
         name: drop
-        path: D:\a\drop
+        path: drop
