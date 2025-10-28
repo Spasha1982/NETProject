@@ -1,44 +1,42 @@
 name: Deploy ASP.NET Framework App
 
 on:
-  workflow_dispatch:  # allows manual trigger from GitHub UI
+  workflow_run:
+    workflows: ["Build ASP.NET Framework App"]
+    types:
+      - completed # allows manual trigger from GitHub UI
 
 permissions:
   id-token: write        # ✅ Required for OIDC login
   contents: read
 
+
 jobs:
   deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: windows-latest
 
     steps:
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: drop                  # must match ArtifactName from build.yml
-        path: D:\a\NETProject\NETProject\drop
-        repository: Spasha1982/NETProject
-        run-id: 18873092812         # 👈 replace with your actual build run ID
-
-    - name: Display contents
-      run: |
-        Write-Host "Downloaded artifact contents:"
-        Get-ChildItem -Recurse "D:\a\NETProject\NETProject\drop"
+      - name: Download artifact from latest successful build
+        uses: actions/download-artifact@v4
+        with:
+          name: drop
+          path: D:\a\NETProject\NETProject\drop
 
       # Example: Deploy to Azure Web App
-    - name: Login to Azure using OIDC
-      uses: azure/login@v2
-      with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      # 6️⃣ Deploy to Azure Web App
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v3
-      with:
-          app-name: "SFinfotechwebapp01"              # 👈 Your Web App name
-          package:  ${{ github.workspace }}/drop
+      - name: Login to Azure using OIDC
+        uses: azure/login@v2
+        with:
+            client-id: ${{ secrets.AZURE_CLIENT_ID }}
+            tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+            subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  
+        # 6️⃣ Deploy to Azure Web App
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+            app-name: "SFinfotechwebapp01"              # 👈 Your Web App name
+            package:  ${{ github.workspace }}/drop
 
       # Optional: Deploy to IIS via WinRM or FTP
       # - name: Deploy to IIS (FTP)
