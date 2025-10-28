@@ -5,7 +5,9 @@ on:
     branches:
       - main
   workflow_dispatch:
-
+permissions:
+  id-token: write       # Required for OIDC (federated) authentication
+  contents: read
 env:
   BuildPlatform: "Any CPU"
   BuildConfiguration: "Release"
