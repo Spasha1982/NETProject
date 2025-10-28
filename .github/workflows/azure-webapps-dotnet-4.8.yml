@@ -3,11 +3,7 @@ name: Build ASP.NET Framework App
 on:
   push:
     branches: [main]
-    
-permissions:
-  id-token: write        # ✅ Required for OIDC login
-  contents: read
-  
+ 
 jobs:
   build:
     runs-on: windows-latest
@@ -123,12 +119,12 @@ jobs:
         name: drop
         path: D:\a\NETProject\NETProject\drop
         
-    - name: Login to Azure using OIDC
-      uses: azure/login@v2
-      with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    # - name: Login to Azure using OIDC
+    #   uses: azure/login@v2
+    #   with:
+    #       client-id: ${{ secrets.AZURE_CLIENT_ID }}
+    #       tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+    #       subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           
     - name: Deploy to Azure Web App
       id: deploy-to-webapp
@@ -137,3 +133,4 @@ jobs:
         app-name: 'SFinfotechwebapp01'     # 👈 Replace this
         slot-name: 'production'                  # Optional, or 'staging'
         package: 'D:\a\NETProject\NETProject\drop\*.zip'
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
