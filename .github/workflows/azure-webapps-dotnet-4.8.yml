@@ -50,7 +50,9 @@ jobs:
         Write-Host "Building and packaging solution: $($sln.FullName)"
         msbuild "$($sln.FullName)" `
           /p:DeployOnBuild=true `
-          /p:WebPublishMethod=Package `
+          /p:WebPublishMethod=FileSystem `
+          /p:DeleteExistingFiles=true `
+          /p:publishUrl="$publishDir"
           /p:PackageAsSingleFile=true `
           /p:SkipInvalidConfigurations=true `
           /p:PackageLocation="$publishDir" `
@@ -132,5 +134,5 @@ jobs:
       with:
         app-name: 'SFinfotechwebapp01'     # 👈 Replace this
         slot-name: 'production'                  # Optional, or 'staging'
-        package: 'D:\a\NETProject\NETProject\drop\*.zip'
+        package: 'D:\a\NETProject\NETProject\drop'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
