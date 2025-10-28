@@ -10,21 +10,20 @@ permissions:
 jobs:
   deploy:
     runs-on: windows-latest
-
     steps:
-      - name: Download artifact from Build #32
+      - name: Download artifact from specific run
         uses: actions/download-artifact@v4
         with:
-          name: drop
-          path: ${{ github.workspace }}/drop
           repository: Spasha1982/NETProject
           run-id: 18873092812
+          name: drop                      # must match ArtifactName
+          path: ${{ github.workspace }}/drop
 
-      - name: Verify contents
+      - name: Verify artifact contents
         shell: pwsh
         run: |
-          Write-Host "Listing downloaded artifact contents..."
-          Get-ChildItem -Path "${{ github.workspace }}/drop" -Recurse
+          Write-Host "Downloaded files in drop folder:"
+          Get-ChildItem -Recurse -Force "${{ github.workspace }}/drop"
 
       # Example: Deploy to Azure Web App
       - name: Login to Azure using OIDC
