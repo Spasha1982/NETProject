@@ -64,22 +64,42 @@ jobs:
 
         Write-Host "Build completed. Packages stored in: $publishDir"
 
-    - name: Copy files to artifact staging directory
-      shell: pwsh
-      run: |
-        $source = "${{ github.workspace }}"
-        $target = Join-Path $source "artifact"
-        Write-Host "Copying files from $source to $target"
 
-        # Ensure target exists
-        New-Item -Path $target -ItemType Directory -Force | Out-Null
+        - name: Copy only JSON config files to artifact staging directory
+          shell: pwsh
+          run: |
+            $source = "${{ github.workspace }}"
+            $target = Join-Path $source "artifact"
+        
+            Write-Host "Copying only JSON config files from $source to $target"
+        
+            # Ensure the target directory exists
+            New-Item -Path $target -ItemType Directory -Force | Out-Null
+        
+            # Copy only .json files recursively
+            Get-ChildItem -Path $source -Recurse -Filter *.json -Force |
+              Where-Object { $_.FullName -notlike "$target*" } |
+              Copy-Item -Destination $target -Force
+        
+            Write-Host "✅ JSON config files copied successfully to: $target"
 
-        # Copy everything except the target folder itself
-        Get-ChildItem -Path $source -Recurse -Force |
-          Where-Object { $_.FullName -notlike "$target*" } |
-          Copy-Item -Destination $target -Recurse -Force
 
-        Write-Host "Files copied successfully to $target"
+    # - name: Copy files to artifact staging directory
+    #   shell: pwsh
+    #   run: |
+    #     $source = "${{ github.workspace }}"
+    #     $target = Join-Path $source "artifact"
+    #     Write-Host "Copying files from $source to $target"
+
+    #     # Ensure target exists
+    #     New-Item -Path $target -ItemType Directory -Force | Out-Null
+
+    #     # Copy everything except the target folder itself
+    #     Get-ChildItem -Path $source -Recurse -Force |
+    #       Where-Object { $_.FullName -notlike "$target*" } |
+    #       Copy-Item -Destination $target -Recurse -Force
+
+    #     Write-Host "Files copied successfully to $target"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
