@@ -1,10 +1,6 @@
 name: Deploy ASP.NET Framework App
 
 on:
-  workflow_run:
-    workflows: ["Build ASP.NET Framework App"]
-    types:
-      - completed
   workflow_dispatch:  # allows manual trigger from GitHub UI
 
 permissions:
@@ -16,11 +12,13 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Download build artifact
+      - name: Download artifact from Build #32
         uses: actions/download-artifact@v4
         with:
           name: drop
           path: ${{ github.workspace }}/drop
+          repository: Spasha1982/NETProject
+          run-id: 207fc29
 
       - name: Verify contents
         shell: pwsh
