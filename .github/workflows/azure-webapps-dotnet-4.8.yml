@@ -1,0 +1,48 @@
+name: Build ASP.NET Framework App
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build with MSBuild
+    runs-on: windows-latest
+
+    env:
+      Solution: '**/*.sln'
+      BuildPlatform: 'Any CPU'
+      BuildConfiguration: 'Release'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup NuGet
+      uses: nuget/setup-nuget@v2
+      with:
+        nuget-version: 'latest'
+
+    - name: Restore NuGet packages
+      run: nuget restore $env:Solution
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+      with:
+        vs-version: '[17.0,)'   # VS 2022 or later
+
+    - name: Build solution
+      run: msbuild $env:Solution /p:Configuration=$env:BuildConfiguration /p:Platform="$env:BuildPlatform" /p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="D:\a\drop"
+
+    - name: Copy JSON config files
+      run: |
+        mkdir -p D:\a\drop\json
+        Get-ChildItem -Path . -Recurse -Include *.json | Copy-Item -Destination D:\a\drop\json
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: drop
+        path: D:\a\drop
