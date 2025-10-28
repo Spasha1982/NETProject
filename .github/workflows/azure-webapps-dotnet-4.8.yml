@@ -1,4 +1,4 @@
-name: Build and Deploy ASP.NET App to Azure Web App (OIDC + Extract PackageTmp)
+name: Build and Deploy ASP.NET App to Azure Web App
 
 on:
   push:
@@ -7,81 +7,39 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write      # 👈 Required for OIDC
+  id-token: write       # needed for OIDC authentication
   contents: read
 
 env:
-  Solution: '**/*.sln'
-  BuildPlatform: 'Any CPU'
-  BuildConfiguration: 'Release'
+  BuildPlatform: "Any CPU"
+  BuildConfiguration: "Release"
 
 jobs:
   build-and-deploy:
     runs-on: windows-latest
 
     steps:
-    # --------------------------
-    # 1️⃣ Checkout
-    # --------------------------
-    - name: Checkout Code
+    # Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    # --------------------------
-    # 2️⃣ Setup NuGet
-    # --------------------------
-    - name: Setup NuGet
-      uses: NuGet/setup-nuget@v2
-
-    # --------------------------
-    # 3️⃣ Restore Packages
-    # --------------------------
-    - name: Restore NuGet Packages
-      run: nuget restore "$env:Solution"
-      shell: pwsh
-
-    # --------------------------
-    # 4️⃣ Setup MSBuild
-    # --------------------------
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
-
-    # --------------------------
-    # 5️⃣ Build & Package (WebDeploy)
-    # --------------------------
-    - name: Build Solution (MSDeploy Package)
+    # 🔹 Automatically find the .sln file and restore NuGet packages
+    - name: Restore NuGet packages
       run: |
-        msbuild $env:Solution `
-          /p:DeployOnBuild=true `
-          /p:WebPublishMethod=Package `
-          /p:PackageAsSingleFile=true `
-          /p:SkipInvalidConfigurations=true `
-          /p:PackageLocation="${{ github.workspace }}\package" `
-          /p:Platform="$env:BuildPlatform" `
-          /p:Configuration="$env:BuildConfiguration"
+        $solution = Get-ChildItem -Path ${{ github.workspace }} -Filter *.sln -Recurse | Select-Object -First 1
+        if (-not $solution) { throw "❌ No .sln file found in repository" }
+        Write-Host "✅ Found solution file: $($solution.FullName)"
+        nuget restore $solution.FullName
       shell: pwsh
 
-    # --------------------------
-    # 6️⃣ Extract WebDeploy Package
-    # --------------------------
-    - name: Extract PackageTmp folder
+    # 🔹 Build the solution (Release mode)
+    - name: Build solution
       run: |
-        $pkg = Get-ChildItem "${{ github.workspace }}\package" -Filter *.zip | Select-Object -First 1
-        if (-not $pkg) { throw "No MSDeploy package found in package folder." }
-        Expand-Archive -Path $pkg.FullName -DestinationPath "${{ github.workspace }}\extracted"
+        $solution = Get-ChildItem -Path ${{ github.workspace }} -Filter *.sln -Recurse | Select-Object -First 1
+        msbuild $solution.FullName /p:Configuration=Release /p:Platform="Any CPU" /p:DeployOnBuild=true /p:WebPublishMethod=FileSystem /p:DeleteExistingFiles=true /p:publishUrl="${{ github.workspace }}\publish"
       shell: pwsh
 
-    # --------------------------
-    # 7️⃣ Upload Artifact (optional)
-    # --------------------------
-    - name: Upload Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: webapp-package
-        path: ${{ github.workspace }}/extracted/PackageTmp
-
-    # --------------------------
-    # 8️⃣ Azure Login (OIDC)
-    # --------------------------
+    # 🔹 Login to Azure using Federated Identity (OIDC)
     - name: Azure Login (OIDC)
       uses: azure/login@v2
       with:
@@ -89,11 +47,9 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    # --------------------------
-    # 9️⃣ Deploy to Azure Web App
-    # --------------------------
+    # 🔹 Deploy to Azure Web App
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
       with:
-        app-name: 'SFinfotechwebapp01'
-        package: ${{ github.workspace }}/extracted/PackageTmp
+        app-name: "SFinfotechwebapp01"   # <-- change this to your Web App name
+        package: "${{ github.workspace }}\\publish"
