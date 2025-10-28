@@ -1,0 +1,54 @@
+name: Deploy ASP.NET Framework App
+
+on:
+  workflow_run:
+    workflows: ["Build ASP.NET Framework App"]
+    types:
+      - completed
+  workflow_dispatch:  # allows manual trigger from GitHub UI
+
+permissions:
+  id-token: write        # ✅ Required for OIDC login
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: drop
+          path: ${{ github.workspace }}/drop
+
+      - name: Verify contents
+        shell: pwsh
+        run: |
+          Write-Host "Listing downloaded artifact contents..."
+          Get-ChildItem -Path "${{ github.workspace }}/drop" -Recurse
+
+      # Example: Deploy to Azure Web App
+      - name: Login to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # 6️⃣ Deploy to Azure Web App
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: "SFinfotechwebapp01"              # 👈 Your Web App name
+          package:  ${{ github.workspace }}/drop
+
+      # Optional: Deploy to IIS via WinRM or FTP
+      # - name: Deploy to IIS (FTP)
+      #   uses: SamKirkland/FTP-Deploy-Action@v4
+      #   with:
+      #     server: ${{ secrets.FTP_SERVER }}
+      #     username: ${{ secrets.FTP_USER }}
+      #     password: ${{ secrets.FTP_PASSWORD }}
+      #     local-dir: ${{ github.workspace }}/drop
+      #     server-dir: /site/wwwroot
