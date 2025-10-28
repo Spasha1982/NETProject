@@ -1,4 +1,4 @@
-name: Build and Deploy ASP.NET App to Azure Web App (OIDC + Fixed Package)
+name: Build and Deploy ASP.NET App to Azure Web App (OIDC)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write      # 👈 Required for OIDC auth
+  id-token: write      # 👈 Required for OIDC
   contents: read
 
 env:
@@ -21,7 +21,7 @@ jobs:
 
     steps:
     # --------------------------
-    # 1️⃣ Checkout source
+    # 1️⃣ Checkout
     # --------------------------
     - name: Checkout Code
       uses: actions/checkout@v4
@@ -33,9 +33,9 @@ jobs:
       uses: NuGet/setup-nuget@v2
 
     # --------------------------
-    # 3️⃣ Restore NuGet Packages
+    # 3️⃣ Restore Packages
     # --------------------------
-    - name: Restore Packages
+    - name: Restore NuGet Packages
       run: nuget restore "$env:Solution"
       shell: pwsh
 
@@ -46,30 +46,41 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     # --------------------------
-    # 5️⃣ Build and Publish (FileSystem)
+    # 5️⃣ Build the Solution
     # --------------------------
-    - name: Build and Publish Solution
+    - name: Build Solution
       run: |
-        msbuild $env:Solution `
-          /p:DeployOnBuild=true `
-          /p:WebPublishMethod=FileSystem `
-          /p:PublishUrl="${{ github.workspace }}\publish" `
+        msbuild $env:Solution /p:DeployOnBuild=true `
+          /p:WebPublishMethod=Package `
+          /p:PackageAsSingleFile=true `
           /p:SkipInvalidConfigurations=true `
+          /p:PackageLocation="$(Build.ArtifactStagingDirectory)" `
+          /p:IncludeServerNameInBuildInfo=true `
+          /p:GenerateBuildInfoConfigFile=true `
           /p:Platform="$env:BuildPlatform" `
           /p:Configuration="$env:BuildConfiguration"
       shell: pwsh
 
     # --------------------------
-    # 6️⃣ Upload Build Artifact (optional)
+    # 6️⃣ Copy Config Files (optional)
+    # --------------------------
+    - name: Copy Config Files
+      run: |
+        mkdir "$env:GITHUB_WORKSPACE\artifact"
+        Copy-Item -Path "**/*.json" -Destination "$env:GITHUB_WORKSPACE\artifact" -Recurse -Force
+      shell: pwsh
+
+    # --------------------------
+    # 7️⃣ Upload Build Artifact
     # --------------------------
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: webapp-publish
-        path: ${{ github.workspace }}/publish
+        name: drop
+        path: ${{ github.workspace }}/artifact
 
     # --------------------------
-    # 7️⃣ Azure Login (OIDC)
+    # 8️⃣ Azure Login (OIDC)
     # --------------------------
     - name: Azure Login (OIDC)
       uses: azure/login@v2
@@ -77,12 +88,13 @@ jobs:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        
 
     # --------------------------
-    # 8️⃣ Deploy to Azure Web App
+    # 9️⃣ Deploy to Azure Web App
     # --------------------------
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
       with:
-        app-name: 'SFinfotechwebapp01'
-        package: ${{ github.workspace }}/publish
+        app-name: '<YOUR_AZURE_WEBAPP_NAME>'
+        package: '${{ github.workspace }}/artifact'
