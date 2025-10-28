@@ -43,8 +43,8 @@ jobs:
         $sln = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
         if (-not $sln) { throw "No .sln file found in repository" }
 
-        $packageDir = "${{ env.PackageLocation }}"
-        New-Item -Path $packageDir -ItemType Directory -Force | Out-Null
+        $publishDir = "${{ env.PackageLocation }}"
+        New-Item -Path $publishDir -ItemType Directory -Force | Out-Null
 
         Write-Host "Building and packaging solution: $($sln.FullName)"
         msbuild "$($sln.FullName)" `
@@ -59,9 +59,9 @@ jobs:
           /p:ReferencePath="${{ env.ReferencePath }}" `
           /p:Platform="${{ env.BuildPlatform }}" `
           /p:Configuration="${{ env.BuildConfiguration }}" `
-          /p:VisualStudioVersion="16.0"
+          /p:VisualStudioVersion="17.0"
 
-        Write-Host "Build completed. Packages stored in: $packageDir"
+        Write-Host "Build completed. Packages stored in: $publishDir"
 
     - name: Copy files to artifact staging directory
       shell: pwsh
