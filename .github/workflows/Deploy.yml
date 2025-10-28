@@ -10,33 +10,33 @@ permissions:
 jobs:
   deploy:
     runs-on: windows-latest
-    steps:
-      - name: Download artifact from specific run
-        uses: actions/download-artifact@v4
-        with:
-          repository: Spasha1982/NETProject
-          run-id: 18873092812
-          name: drop                      # must match ArtifactName
-          path: ${{ github.workspace }}/drop
 
-      - name: Verify artifact contents
-        shell: pwsh
-        run: |
-          Write-Host "Downloaded files in drop folder:"
-          Get-ChildItem -Recurse -Force "${{ github.workspace }}/drop"
+    steps:
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: drop                  # must match ArtifactName from build.yml
+        path: D:\a\NETProject\NETProject\drop
+        repository: Spasha1982/NETProject
+        run-id: 18873092812         # 👈 replace with your actual build run ID
+
+    - name: Display contents
+      run: |
+        Write-Host "Downloaded artifact contents:"
+        Get-ChildItem -Recurse "D:\a\NETProject\NETProject\drop"
 
       # Example: Deploy to Azure Web App
-      - name: Login to Azure using OIDC
-        uses: azure/login@v2
-        with:
+    - name: Login to Azure using OIDC
+      uses: azure/login@v2
+      with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # 6️⃣ Deploy to Azure Web App
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
           app-name: "SFinfotechwebapp01"              # 👈 Your Web App name
           package:  ${{ github.workspace }}/drop
 
