@@ -43,22 +43,27 @@ jobs:
       - name: Build and Publish
         shell: pwsh
         run: |
-          $project = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter *.csproj -Recurse | Select-Object -First 1
+          $project = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter *.csproj -Recurse | Where-Object { $_.FullName -match 'Website|WebApplication' } | Select-Object -First 1
           if (-not $project) {
-            Write-Error "❌ No .csproj file found!"
+            Write-Error "❌ No .csproj file found for web app!"
             exit 1
           }
 
           Write-Host "🔧 Building project: $($project.FullName)"
           $publishDir = Join-Path $env:RUNNER_TEMP "publish_output"
 
-          # Find MSBuild path
+          # Ensure directory exists
+          if (-not (Test-Path $publishDir)) {
+            New-Item -ItemType Directory -Path $publishDir | Out-Null
+            Write-Host "📁 Created directory: $publishDir"
+          }
+
+          # Find MSBuild.exe
           $msbuildPaths = @(
             "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe",
             "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe"
           )
           $msbuild = $msbuildPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-
           if (-not $msbuild) {
             Write-Error "❌ MSBuild.exe not found on this agent!"
             exit 1
@@ -71,10 +76,17 @@ jobs:
             /p:DeployOnBuild=true `
             /p:WebPublishMethod=FileSystem `
             /p:DeleteExistingFiles=true `
-            /p:publishUrl="$publishDir"
+            /p:publishUrl="$publishDir" `
+            /p:AutoParameterizationWebConfigConnectionStrings=false
 
-          Write-Host "✅ Build completed. Published to: $publishDir"
-          Get-ChildItem $publishDir
+          if (Test-Path $publishDir) {
+            Write-Host "✅ Build completed. Published to: $publishDir"
+            Get-ChildItem -Recurse $publishDir
+          } else {
+            Write-Error "❌ Publish folder not found! Check MSBuild output above for any errors."
+            exit 1
+          }
+
 
       # 5️⃣ Login to Azure using OIDC (no secrets required)
       - name: Login to Azure using OIDC
