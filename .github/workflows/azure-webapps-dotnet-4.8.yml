@@ -2,7 +2,7 @@ name: Build ASP.NET Framework App
 
 on:
   push:
-    branches: none
+    branches: [main]
     
 permissions:
   id-token: write        # ✅ Required for OIDC login
